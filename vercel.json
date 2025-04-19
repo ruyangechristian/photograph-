@@ -1,0 +1,10 @@
+{
+    "build": {
+      "env": {
+        "NPM_CONFIG_PRODUCTION": "false"
+      }
+    },
+    "installCommand": "npm install",
+    "buildCommand": "npm run build"
+  }
+  
