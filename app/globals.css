@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  font-family: "Inter", sans-serif;
+}
+
+/* Custom focus styles */
+*:focus-visible {
+  outline: 2px solid black;
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Form element focus styles */
+input:focus,
+textarea:focus,
+select:focus {
+  @apply ring-1 ring-black border-black;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Image hover effects */
+.image-hover {
+  transition: transform 0.5s ease;
+}
+
+.image-hover:hover {
+  transform: scale(1.05);
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply px-8 py-3 bg-black text-white hover:bg-gray-800 transition duration-300;
+}
+
+.btn-outline {
+  @apply px-8 py-3 border border-black hover:bg-black hover:text-white transition duration-300;
+}
+
+/* Custom card styles */
+.card {
+  @apply bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300;
+}
+
+/* Typography enhancements */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply tracking-wide;
+}
+
+/* Gallery grid improvements */
+.gallery-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8;
+}
+
+.gallery-item {
+  @apply overflow-hidden rounded-lg;
+}
