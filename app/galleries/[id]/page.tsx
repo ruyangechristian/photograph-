@@ -4,8 +4,7 @@ import { ArrowLeft } from "lucide-react"
 
 async function getGalleryData(id: string) {
   try {
-    // Change from localhost to your deployed URL
-    const res = await fetch(`https://photograph-seven.vercel.app/api/albums/${id}`, { next: { revalidate: 60 } })
+    const res = await fetch(`https://www.iremefocus.com/api/albums/${id}`)
     if (!res.ok) throw new Error('Failed to fetch gallery')
     const album = await res.json()
     
@@ -22,13 +21,22 @@ async function getGalleryData(id: string) {
     }
   } catch (error) {
     console.error('Error fetching gallery:', error)
-    return {
-      title: "Gallery Not Found",
-      description: "Unable to load gallery",
-      date: "",
-      location: "",
-      images: []
+    // Fallback to your original hardcoded data
+    const fallbackGalleries = {
+      "1": {
+        title: "Wedding Ceremonies",
+        description: "Beautiful moments from wedding ceremonies",
+        date: "2023",
+        location: "Various Venues",
+        images: [
+          { id: 1, src: "/images/wildlife-monkey1.png", alt: "Wedding ceremony example" },
+          { id: 2, src: "/images/wildlife-monkey2.png", alt: "Wedding ceremony example" },
+          // ... other fallback images
+        ]
+      },
+      // ... other fallback galleries
     }
+    return fallbackGalleries[id as keyof typeof fallbackGalleries] || fallbackGalleries["1"]
   }
 }
 
@@ -41,7 +49,7 @@ export default async function GalleryDetailPage({ params }: { params: { id: stri
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to Galleries
       </Link>
-      
+
       <div className="mb-12">
         <h1 className="text-3xl md:text-4xl font-light mb-4">{gallery.title}</h1>
         <p className="text-gray-600 mb-4">{gallery.description}</p>
@@ -50,7 +58,7 @@ export default async function GalleryDetailPage({ params }: { params: { id: stri
           <span>Location: {gallery.location}</span>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {gallery.images.map((image: any) => (
           <div
@@ -69,7 +77,7 @@ export default async function GalleryDetailPage({ params }: { params: { id: stri
           </div>
         ))}
       </div>
-      
+
       <div className="mt-16 text-center">
         <h2 className="text-2xl font-light mb-6">Interested in booking your wedding?</h2>
         <Link href="/contact">
