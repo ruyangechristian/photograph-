@@ -4,7 +4,8 @@ import { ArrowLeft } from "lucide-react"
 
 async function getGalleryData(id: string) {
   try {
-    const res = await fetch(`http://localhost:3000/api/albums/${id}`)
+    // Change from localhost to your deployed URL
+    const res = await fetch(`https://photograph-seven.vercel.app/api/albums/${id}`, { next: { revalidate: 60 } })
     if (!res.ok) throw new Error('Failed to fetch gallery')
     const album = await res.json()
     
