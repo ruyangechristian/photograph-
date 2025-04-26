@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface GalleryImage {
   _id: string;
@@ -14,6 +15,10 @@ export default function GalleriesPage() {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -30,6 +35,35 @@ export default function GalleriesPage() {
     };
     fetchImages();
   }, []);
+
+  // Modal navigation handlers
+  const openModal = (index: number) => {
+    setCurrentIndex(index);
+    setModalOpen(true);
+    document.body.style.overflow = 'hidden';
+  };
+  const closeModal = () => {
+    setModalOpen(false);
+    document.body.style.overflow = '';
+  };
+  const goToNext = () => {
+    if (currentIndex < images.length - 1) setCurrentIndex(currentIndex + 1);
+  };
+  const goToPrev = () => {
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+  };
+
+  // Keyboard navigation for modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!modalOpen) return;
+      if (e.key === "Escape") closeModal();
+      if (e.key === "ArrowRight") goToNext();
+      if (e.key === "ArrowLeft") goToPrev();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalOpen, currentIndex, images.length]);
 
   const handleDelete = async (publicId: string) => {
     if (!confirm("Are you sure you want to delete this image?")) return;
@@ -95,8 +129,12 @@ export default function GalleriesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {images.map((image) => (
-            <div key={image._id} className="relative group">
+          {images.map((image, idx) => (
+            <div
+              key={image._id}
+              className="relative group cursor-pointer"
+              onClick={() => openModal(idx)}
+            >
               <div className="aspect-square overflow-hidden rounded-lg shadow-md">
                 <Image
                   src={image.url}
@@ -119,6 +157,46 @@ export default function GalleriesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      {modalOpen && images[currentIndex] && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+          <button
+            onClick={closeModal}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-10"
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <div className="relative w-full max-w-3xl h-full max-h-[90vh] flex items-center justify-center">
+            <Image
+              src={images[currentIndex].url}
+              alt={`Gallery image ${images[currentIndex].public_id}`}
+              fill
+              className="object-contain"
+              priority
+            />
+            <div className="absolute inset-0 flex items-center justify-between p-4">
+              <button
+                onClick={goToPrev}
+                className="p-2 text-white hover:text-gray-300 transition-colors bg-black/30 rounded-full"
+                disabled={currentIndex === 0}
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+              <button
+                onClick={goToNext}
+                className="p-2 text-white hover:text-gray-300 transition-colors bg-black/30 rounded-full"
+                disabled={currentIndex === images.length - 1}
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            </div>
+            <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm">
+              {currentIndex + 1} / {images.length}
+            </div>
+          </div>
         </div>
       )}
     </div>
