@@ -3,7 +3,7 @@ import connectToDB from '@/lib/mongoose'
 import Album from '@/models/album.model'
 import { uploadImage, deleteImage } from '@/lib/cloudinary'
 
-export const maxDuration = 300 // 5 minutes
+export const maxDuration = 60 // 1 minute
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
