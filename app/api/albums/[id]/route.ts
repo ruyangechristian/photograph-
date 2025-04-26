@@ -5,7 +5,8 @@ import Album from '@/models/album.model'
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
     await connectToDB()
-    const album = await Album.findById(params.id)
+    const { id } = await params
+    const album = await Album.findById(id)
     
     if (!album) {
       return NextResponse.json(

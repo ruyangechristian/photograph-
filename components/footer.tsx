@@ -43,19 +43,19 @@ export default function Footer() {
             <div className="flex flex-col space-y-3">
               <a href="mailto:info@iremefocus.com" className="text-sm text-gray-300 hover:text-white flex items-center">
                 <Mail size={16} className="mr-2" />
-                info@iremefocus.com
+                iremefocus@gmail.com
               </a>
-              <a href="tel:0788718396" className="text-sm text-gray-300 hover:text-white flex items-center">
+              <a href="tel:0785973988" className="text-sm text-gray-300 hover:text-white flex items-center">
                 <Phone size={16} className="mr-2" />
-                0788718396
+                0785973988
               </a>
               <p className="text-sm text-gray-300 flex items-center">
                 <span className="mr-2">@</span>
-                ruyange_christian
+                Insta @iremefocus
               </p>
               <p className="text-sm text-gray-300 flex items-center">
                 <MapPin size={16} className="mr-2" />
-                Available worldwide
+                Kigali, Rwanda
               </p>
               <div className="flex space-x-4 mt-4">
                 <a

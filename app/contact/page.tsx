@@ -61,28 +61,28 @@ export default function ContactPage() {
               <Mail className="w-5 h-5 mt-1 mr-3 text-gray-600" />
               <div>
                 <h3 className="font-medium">Email</h3>
-                <p className="text-gray-600">info@iremefocus.com</p>
+                <p className="text-gray-600">iremefocus@gmail.com</p>
               </div>
             </div>
             <div className="flex items-start">
               <Phone className="w-5 h-5 mt-1 mr-3 text-gray-600" />
               <div>
                 <h3 className="font-medium">Phone</h3>
-                <p className="text-gray-600">0788718396</p>
+                <p className="text-gray-600">0785973988</p>
               </div>
             </div>
             <div className="flex items-start">
               <div className="w-5 h-5 mt-1 mr-3 text-gray-600 flex items-center justify-center">@</div>
               <div>
                 <h3 className="font-medium">Instagram</h3>
-                <p className="text-gray-600">@ruyange_christian</p>
+                <p className="text-gray-600">Insta @iremefocus</p>
               </div>
             </div>
             <div className="flex items-start">
               <MapPin className="w-5 h-5 mt-1 mr-3 text-gray-600" />
               <div>
                 <h3 className="font-medium">Location</h3>
-                <p className="text-gray-600">Available for travel worldwide</p>
+                <p className="text-gray-600">Kigali, Rwanda</p>
               </div>
             </div>
             <div className="flex items-start">
