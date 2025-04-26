@@ -6,7 +6,7 @@ import { Camera, Upload, X, Check, Image, Loader2, Trash2, Edit } from 'lucide-r
 
 type ImageType = {
   url: string
-  public_id?: string // Optional for backward compatibility
+  public_id?: string
 }
 
 type Album = {
@@ -35,6 +35,8 @@ export default function AlbumsPage() {
   })
   const [coverPreview, setCoverPreview] = useState('')
   const [imagesPreviews, setImagesPreviews] = useState<string[]>([])
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
 
   // Fetch albums
   const fetchAlbums = useCallback(async () => {
@@ -64,16 +66,40 @@ export default function AlbumsPage() {
   const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      // Validate file type and size
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload an image file (JPEG, PNG, WEBP)')
+        return
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB
+        setError('Cover image must be less than 10MB')
+        return
+      }
+      
       setForm(prev => ({ ...prev, coverImage: file }))
       setCoverPreview(URL.createObjectURL(file))
+      setError(null)
     }
   }
 
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length) {
-      setForm(prev => ({ ...prev, images: files }))
-      setImagesPreviews(files.map(file => URL.createObjectURL(file)))
+      // Validate each file
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) {
+          setError('Please upload only image files (JPEG, PNG, WEBP)')
+          return
+        }
+        if (file.size > 10 * 1024 * 1024) { // 10MB
+          setError('Each image must be less than 10MB')
+          return
+        }
+      }
+      
+      setForm(prev => ({ ...prev, images: [...prev.images, ...files] }))
+      setImagesPreviews(prev => [...prev, ...files.map(file => URL.createObjectURL(file))])
+      setError(null)
     }
   }
 
@@ -87,24 +113,62 @@ export default function AlbumsPage() {
     setCoverPreview('')
     setImagesPreviews([])
     setEditingAlbum(null)
+    setError(null)
   }
 
   // Handle form submission
-  // Handle form submission - Updated to include ID for edits
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Client-side validation
+    if (!form.title.trim()) {
+      setError('Title is required')
+      return
+    }
+    
+    if (form.title.trim().length < 3) {
+      setError('Title must be at least 3 characters')
+      return
+    }
+    
+    if (!form.date) {
+      setError('Date is required')
+      return
+    }
+    
+    if (!form.coverImage && !editingAlbum) {
+      setError('Cover image is required')
+      return
+    }
+    
+    if (form.images.length === 0 && !editingAlbum) {
+      setError('Please upload at least one image')
+      return
+    }
+
     setError(null)
     setLoading(true)
+    setIsUploading(true)
+    setUploadProgress(0)
 
     try {
       const formData = new FormData()
-      formData.append('title', form.title)
+      formData.append('title', form.title.trim())
       formData.append('date', form.date)
-      if (editingAlbum) formData.append('id', editingAlbum._id)
-      if (form.coverImage) formData.append('coverImage', form.coverImage)
-      form.images.forEach(image => formData.append('images', image))
+      
+      if (editingAlbum) {
+        formData.append('id', editingAlbum._id)
+      }
+      
+      if (form.coverImage) {
+        formData.append('coverImage', form.coverImage)
+      }
+      
+      form.images.forEach(image => {
+        formData.append('images', image)
+      })
 
-      const url = editingAlbum ? '/api/albums' : '/api/albums'
+      const url = '/api/albums'
       const method = editingAlbum ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -117,13 +181,28 @@ export default function AlbumsPage() {
         throw new Error(errorData.error || (editingAlbum ? 'Failed to update album' : 'Failed to create album'))
       }
 
+      const data = await res.json()
       await fetchAlbums()
       setShowCreateForm(false)
       resetForm()
+      setUploadProgress(100)
+
+      // Show success message with details
+      let message = data.message || 'Album created successfully'
+      if (data.warnings && data.warnings.length > 0) {
+        message += `\n\nSome images could not be uploaded:\n${data.warnings.join('\n')}`
+      }
+      alert(message)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
+      if (err instanceof Error && err.message.includes('timeout')) {
+        setError('Upload timed out. Please try again with fewer images or smaller file sizes.')
+      }
     } finally {
       setLoading(false)
+      setIsUploading(false)
+      // Reset progress after a short delay
+      setTimeout(() => setUploadProgress(0), 2000)
     }
   }
 
@@ -142,13 +221,28 @@ export default function AlbumsPage() {
         throw new Error(errorData.error || 'Failed to delete album')
       }
 
+      const data = await res.json()
       await fetchAlbums()
+      
+      // Show success message with details
+      let message = `Successfully deleted album`
+      if (data.deletedImages) {
+        message += ` with ${data.deletedImages} images`
+      }
+      if (data.warnings && data.warnings.length > 0) {
+        message += `\n\nSome images could not be deleted:\n${data.warnings.join('\n')}`
+      }
+      alert(message)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete album')
+      if (err instanceof Error && err.message.includes('timeout')) {
+        setError('Delete operation timed out. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
   }
+
   // Handle edit
   const handleEdit = (album: Album) => {
     setEditingAlbum(album)
@@ -195,7 +289,7 @@ export default function AlbumsPage() {
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block mb-2 font-medium">Title</label>
+              <label className="block mb-2 font-medium">Title *</label>
               <input
                 type="text"
                 name="title"
@@ -203,12 +297,13 @@ export default function AlbumsPage() {
                 onChange={handleChange}
                 className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                 required
+                minLength={3}
               />
             </div>
             <div>
-              <label className="block mb-2 font-medium">Date</label>
+              <label className="block mb-2 font-medium">Date *</label>
               <input
-                type="text"
+                type="date"
                 name="date"
                 value={form.date}
                 onChange={handleChange}
@@ -217,7 +312,7 @@ export default function AlbumsPage() {
               />
             </div>
             <div>
-              <label className="block mb-2 font-medium">Cover Image</label>
+              <label className="block mb-2 font-medium">Cover Image {!editingAlbum && '*'}</label>
               {coverPreview ? (
                 <div className="relative mb-4 group">
                   <img
@@ -245,7 +340,7 @@ export default function AlbumsPage() {
                     onChange={handleCoverImageChange}
                     className="hidden"
                     id="cover-upload"
-                    accept="image/*"
+                    accept="image/jpeg, image/png, image/webp"
                     required={!editingAlbum}
                   />
                   <label htmlFor="cover-upload" className="cursor-pointer">
@@ -258,7 +353,8 @@ export default function AlbumsPage() {
             </div>
             <div>
               <label className="block mb-2 font-medium">
-                Album Images <span className="text-gray-500 text-sm">(Select multiple)</span>
+                Album Images {!editingAlbum && '*'}
+                <span className="text-gray-500 text-sm"> (Select multiple)</span>
               </label>
               {imagesPreviews.length > 0 ? (
                 <>
@@ -297,7 +393,7 @@ export default function AlbumsPage() {
                       onChange={handleImagesChange}
                       className="hidden"
                       id="images-upload"
-                      accept="image/*"
+                      accept="image/jpeg, image/png, image/webp"
                       multiple
                     />
                     <label htmlFor="images-upload" className="cursor-pointer flex flex-col items-center">
@@ -314,7 +410,7 @@ export default function AlbumsPage() {
                     onChange={handleImagesChange}
                     className="hidden"
                     id="images-upload"
-                    accept="image/*"
+                    accept="image/jpeg, image/png, image/webp"
                     multiple
                     required={!editingAlbum}
                   />
@@ -326,6 +422,21 @@ export default function AlbumsPage() {
                 </div>
               )}
             </div>
+            {isUploading && (
+              <div className="mt-4">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {uploadProgress === 0 ? 'Preparing upload...' : 
+                   uploadProgress === 100 ? 'Upload complete!' : 
+                   `Uploading... ${uploadProgress}%`}
+                </p>
+              </div>
+            )}
             <div className="flex justify-end space-x-4 pt-4">
               <button
                 type="button"
@@ -398,7 +509,7 @@ export default function AlbumsPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-bold text-lg mb-1 line-clamp-1">{album.title}</h3>
-                    <p className="text-gray-600 text-sm">{album.date}</p>
+                    <p className="text-gray-600 text-sm">{new Date(album.date).toLocaleDateString()}</p>
                   </div>
                   <div className="flex space-x-2">
                     <button
