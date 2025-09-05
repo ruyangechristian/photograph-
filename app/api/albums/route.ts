@@ -6,6 +6,7 @@ import { uploadImage, deleteImage } from '@/lib/cloudinary'
 export const maxDuration = 60 // 1 minute
 export const dynamic = 'force-dynamic'
 
+// ================= GET =================
 export async function GET() {
   try {
     await connectToDB()
@@ -19,6 +20,7 @@ export async function GET() {
   }
 }
 
+// ================= POST =================
 export async function POST(request: Request) {
   try {
     await connectToDB()
@@ -36,31 +38,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate file sizes (10MB limit per image)
-    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-    const MAX_TOTAL_SIZE = 200 * 1024 * 1024 // 200MB total limit
-    
-    // Check total size of all images
-    let totalSize = coverImage.size
-    for (const image of images) {
-      totalSize += image.size
-      if (image.size > MAX_FILE_SIZE) {
-        return NextResponse.json(
-          { error: 'One or more images are too large. Maximum size is 10MB per image' },
-          { status: 400 }
-        )
-      }
-    }
-
-    if (totalSize > MAX_TOTAL_SIZE) {
-      return NextResponse.json(
-        { error: 'Total size of all images is too large. Maximum total size is 200MB' },
-        { status: 400 }
-      )
-    }
-
-    let uploadedImages = []
-    let errors = []
+    let uploadedImages: { url: string; public_id: string }[] = []
+    let errors: string[] = []
 
     // Upload cover image with retry
     let coverUrl = ''
@@ -78,14 +57,13 @@ export async function POST(request: Request) {
           errors.push('Failed to upload cover image')
           throw new Error('Failed to upload cover image')
         } else {
-          // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         }
       }
     }
 
-    // Upload album images in smaller chunks with retry
-    const CHUNK_SIZE = 5 // Reduced chunk size
+    // Upload album images in chunks with retry
+    const CHUNK_SIZE = 5
     for (let i = 0; i < images.length; i += CHUNK_SIZE) {
       const chunk = images.slice(i, i + CHUNK_SIZE)
       for (let attempt = 1; attempt <= 3; attempt++) {
@@ -103,24 +81,20 @@ export async function POST(request: Request) {
               }
             })
           )
-          // Filter out failed uploads and add successful ones
-          uploadedImages.push(...chunkUploads.filter(Boolean))
-          break // If successful, move to next chunk
+          uploadedImages.push(...chunkUploads.filter(Boolean) as any)
+          break
         } catch (error) {
           if (attempt === 3) {
             console.error(`Failed to upload chunk after 3 attempts:`, error)
             errors.push(`Failed to upload chunk of images`)
           } else {
-            // Wait before retrying
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
           }
         }
       }
     }
 
-    // Only create album if we have at least one image uploaded
     if (uploadedImages.length === 0) {
-      // Clean up cover image if no other images were uploaded
       if (coverPublicId) {
         try {
           await deleteImage(coverPublicId)
@@ -157,12 +131,6 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     console.error('Error creating album:', error)
-    if (error instanceof Error && error.name === 'TimeoutError') {
-      return NextResponse.json(
-        { error: 'Upload timed out. Please try again with fewer images or smaller file sizes.' },
-        { status: 504 }
-      )
-    }
     return NextResponse.json(
       { error: 'Failed to create album' },
       { status: 500 }
@@ -170,6 +138,7 @@ export async function POST(request: Request) {
   }
 }
 
+// ================= PUT =================
 export async function PUT(request: Request) {
   try {
     await connectToDB()
@@ -200,9 +169,7 @@ export async function PUT(request: Request) {
     let coverUrl = existingAlbum.coverImage.url
     let coverPublicId = existingAlbum.coverImage.public_id
     if (coverImage) {
-      // Delete old cover image
       await deleteImage(existingAlbum.coverImage.public_id)
-      // Upload new cover image
       const coverBuffer = Buffer.from(await coverImage.arrayBuffer())
       const uploaded = await uploadImage(coverBuffer)
       coverUrl = uploaded.url
@@ -249,6 +216,7 @@ export async function PUT(request: Request) {
   }
 }
 
+// ================= DELETE =================
 export async function DELETE(request: Request) {
   try {
     await connectToDB()
@@ -271,7 +239,7 @@ export async function DELETE(request: Request) {
     }
 
     let deletedImages = 0
-    let errors = []
+    let errors: string[] = []
 
     // Delete cover image with retry
     let coverDeleted = false
@@ -286,14 +254,13 @@ export async function DELETE(request: Request) {
           console.error('Failed to delete cover image after 3 attempts:', error)
           errors.push('Failed to delete cover image')
         } else {
-          // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         }
       }
     }
 
-    // Delete album images in smaller chunks with retry
-    const CHUNK_SIZE = 5 // Reduced chunk size
+    // Delete album images in chunks with retry
+    const CHUNK_SIZE = 5
     const images = [...album.images]
     
     for (let i = 0; i < images.length; i += CHUNK_SIZE) {
@@ -311,20 +278,18 @@ export async function DELETE(request: Request) {
               }
             })
           )
-          break // If successful, move to next chunk
+          break
         } catch (error) {
           if (attempt === 3) {
             console.error(`Failed to delete chunk after 3 attempts:`, error)
             errors.push(`Failed to delete chunk of images`)
           } else {
-            // Wait before retrying
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
           }
         }
       }
     }
 
-    // Only delete from database if we successfully deleted at least the cover image
     if (coverDeleted) {
       await Album.findByIdAndDelete(id)
     } else {
@@ -347,12 +312,6 @@ export async function DELETE(request: Request) {
     )
   } catch (error) {
     console.error('Error deleting album:', error)
-    if (error instanceof Error && error.name === 'TimeoutError') {
-      return NextResponse.json(
-        { error: 'Delete operation timed out. Please try again.' },
-        { status: 504 }
-      )
-    }
     return NextResponse.json(
       { error: 'Failed to delete album' },
       { status: 500 }
