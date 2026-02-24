@@ -4,20 +4,30 @@ import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
-  const isPublicPath = path === '/login'
+  const isPublicPath = path === '/login' || path === '/api/auth/login'
   
-  // Only check cookies in middleware (server-side)
-  const isAuthenticated = request.cookies.get('isAuthenticated')?.value === 'true'
+  // Check for session cookie set by auth.ts
+  const session = request.cookies.get('session')?.value
+  const isAuthenticated = !!session
 
-  if (!isAuthenticated && !isPublicPath) {
+  // Protect non-public routes
+  if (!isAuthenticated && !isPublicPath && path.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/login', request.nextUrl))
   }
 
-  if (isAuthenticated && isPublicPath) {
+  // Redirect authenticated users away from login
+  if (isAuthenticated && path === '/login') {
     return NextResponse.redirect(new URL('/dashboard', request.nextUrl))
   }
+
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: [
+    '/dashboard/:path*',
+    '/login',
+    '/api/albums/:path*',
+    '/api/images/:path*',
+  ],
 }

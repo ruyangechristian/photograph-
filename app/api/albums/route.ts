@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import connectToDB from '@/lib/mongoose'
 import Album from '@/models/album.model'
 import { uploadImage, deleteImage } from '@/lib/cloudinary'
+import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-utils'
 
 export const maxDuration = 60 // 1 minute
 export const dynamic = 'force-dynamic'
@@ -11,12 +12,10 @@ export async function GET() {
   try {
     await connectToDB()
     const albums = await Album.find().sort({ createdAt: -1 })
-    return NextResponse.json(albums)
+    return successResponse(albums, 'Albums fetched successfully')
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch albums' },
-      { status: 500 }
-    )
+    console.error('[API] Error fetching albums:', error)
+    return serverErrorResponse(error)
   }
 }
 
@@ -32,10 +31,11 @@ export async function POST(request: Request) {
     const images = formData.getAll('images') as File[]
 
     if (!title || !date || !coverImage || images.length === 0) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+      return errorResponse('Missing required fields: title, date, coverImage, and images', 400)
+    }
+    
+    if (title.trim().length < 3) {
+      return errorResponse('Album title must be at least 3 characters long', 400)
     }
 
     let uploadedImages: { url: string; public_id: string }[] = []
@@ -120,21 +120,18 @@ export async function POST(request: Request) {
 
     await newAlbum.save()
 
-    return NextResponse.json(
-      { 
-        success: true, 
+    return successResponse(
+      {
         album: newAlbum,
-        message: `Successfully uploaded ${uploadedImages.length + 1} images`,
-        warnings: errors.length > 0 ? errors : undefined
+        uploadedCount: uploadedImages.length + 1,
+        warnings: errors.length > 0 ? errors : undefined,
       },
-      { status: 201 }
+      `Successfully uploaded ${uploadedImages.length + 1} images`,
+      201
     )
   } catch (error) {
-    console.error('Error creating album:', error)
-    return NextResponse.json(
-      { error: 'Failed to create album' },
-      { status: 500 }
-    )
+    console.error('[API] Error creating album:', error)
+    return serverErrorResponse(error)
   }
 }
 
@@ -151,18 +148,12 @@ export async function PUT(request: Request) {
     const images = formData.getAll('images') as File[]
 
     if (!id || !title || !date) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+      return errorResponse('Missing required fields: id, title, and date', 400)
     }
 
     const existingAlbum = await Album.findById(id)
     if (!existingAlbum) {
-      return NextResponse.json(
-        { error: 'Album not found' },
-        { status: 404 }
-      )
+      return errorResponse('Album not found', 404)
     }
 
     // Update cover image if provided
@@ -203,16 +194,10 @@ export async function PUT(request: Request) {
       { new: true }
     )
 
-    return NextResponse.json(
-      { success: true, album: updatedAlbum },
-      { status: 200 }
-    )
+    return successResponse(updatedAlbum, 'Album updated successfully')
   } catch (error) {
-    console.error('Error updating album:', error)
-    return NextResponse.json(
-      { error: 'Failed to update album' },
-      { status: 500 }
-    )
+    console.error('[API] Error updating album:', error)
+    return serverErrorResponse(error)
   }
 }
 
@@ -224,18 +209,12 @@ export async function DELETE(request: Request) {
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Album ID is required' },
-        { status: 400 }
-      )
+      return errorResponse('Album ID is required', 400)
     }
 
     const album = await Album.findById(id)
     if (!album) {
-      return NextResponse.json(
-        { error: 'Album not found' },
-        { status: 404 }
-      )
+      return errorResponse('Album not found', 404)
     }
 
     let deletedImages = 0
@@ -293,28 +272,17 @@ export async function DELETE(request: Request) {
     if (coverDeleted) {
       await Album.findByIdAndDelete(id)
     } else {
-      return NextResponse.json(
-        { 
-          error: 'Failed to delete album - could not delete cover image',
-          details: errors
-        },
-        { status: 500 }
+      return serverErrorResponse(
+        `Failed to delete album - could not delete cover image. Details: ${errors.join(', ')}`
       )
     }
 
-    return NextResponse.json(
-      { 
-        success: true, 
-        message: 'Album deleted successfully',
-        deletedImages,
-        warnings: errors.length > 0 ? errors : undefined
-      }
+    return successResponse(
+      { deletedImages, warnings: errors.length > 0 ? errors : undefined },
+      'Album deleted successfully'
     )
   } catch (error) {
-    console.error('Error deleting album:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete album' },
-      { status: 500 }
-    )
+    console.error('[API] Error deleting album:', error)
+    return serverErrorResponse(error)
   }
 }

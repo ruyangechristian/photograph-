@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Mail, Lock, LogIn, AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -16,23 +16,23 @@ export default function LoginPage() {
     setError("")
     
     try {
-      // Validate credentials
-      const isValidCredentials = 
-        email.trim() === "iremefocus@gmail.com" &&
-        password === "Iremefocus@!24"
-      
-      if (isValidCredentials) {
-        // Set cookie (accessible in middleware)
-        document.cookie = "isAuthenticated=true; path=/; max-age=86400" // 1 day
-        
-        // Optional: Also set localStorage for client-side checks
-        localStorage.setItem("isAuthenticated", "true")
-        
-        // Redirect to dashboard
-        router.push("/dashboard")
-      } else {
-        setError("Invalid email or password")
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || "Login failed")
+        return
       }
+
+      // Redirect to dashboard on success
+      router.push("/dashboard")
     } catch (err) {
       setError("An error occurred during login")
       console.error("Login error:", err)
@@ -61,20 +61,20 @@ export default function LoginPage() {
         
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="email">
-              Email Address
+            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="username">
+              Username
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Mail className="h-5 w-5 text-gray-400" />
               </div>
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>

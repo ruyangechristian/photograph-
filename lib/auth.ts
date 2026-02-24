@@ -1,57 +1,107 @@
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { createHash } from "crypto"
-import prisma from "./prisma"
+import bcrypt from "bcrypt"
+import connectToDB from "./mongoose"
+import User from "@/models/user.model"
 
-// Simple password hashing function
-export function hashPassword(password: string): string {
-  return createHash("sha256").update(password).digest("hex")
+const SALT_ROUNDS = 10
+
+// Hash password using bcrypt
+export async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, SALT_ROUNDS)
+}
+
+// Compare password with hash
+export async function comparePassword(password: string, hash: string): Promise<boolean> {
+  return await bcrypt.compare(password, hash)
 }
 
 // Check if the credentials are valid
 export async function validateCredentials(username: string, password: string) {
-  const user = await prisma.user.findUnique({
-    where: { username },
-  })
+  try {
+    await connectToDB()
+    const user = await User.findOne({ username }).select("+password")
 
-  if (!user) return false
+    if (!user) return false
 
-  const hashedPassword = hashPassword(password)
-  return user.password === hashedPassword
+    const isValid = await comparePassword(password, user.password)
+    return isValid
+  } catch (error) {
+    console.error("Error validating credentials:", error)
+    return false
+  }
 }
 
 // Set a session cookie
-export function setSession(username: string) {
+export async function setSession(username: string) {
+  const cookieStore = await cookies()
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-  cookies().set("session", username, { expires, httpOnly: true, path: "/" })
+  cookieStore.set("session", username, { 
+    expires, 
+    httpOnly: true, 
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax"
+  })
 }
 
 // Get the current session
-export function getSession() {
-  return cookies().get("session")?.value
+export async function getSession() {
+  const cookieStore = await cookies()
+  return cookieStore.get("session")?.value
 }
 
 // Clear the session
-export function clearSession() {
-  cookies().delete("session")
+export async function clearSession() {
+  const cookieStore = await cookies()
+  cookieStore.delete("session")
 }
 
 // Check if the user is authenticated
 export async function isAuthenticated() {
-  const session = getSession()
-  if (!session) return false
+  try {
+    const session = await getSession()
+    if (!session) return false
 
-  const user = await prisma.user.findUnique({
-    where: { username: session },
-  })
+    await connectToDB()
+    const user = await User.findOne({ username: session })
 
-  return !!user
+    return !!user
+  } catch (error) {
+    console.error("Error checking authentication:", error)
+    return false
+  }
 }
 
 // Middleware to protect routes
 export async function requireAuth() {
   const authenticated = await isAuthenticated()
   if (!authenticated) {
-    redirect("/admin/login")
+    redirect("/login")
+  }
+}
+
+// Create a new user (for admin setup)
+export async function createUser(username: string, password: string, email?: string) {
+  try {
+    await connectToDB()
+    
+    const existingUser = await User.findOne({ username })
+    if (existingUser) {
+      throw new Error("User already exists")
+    }
+
+    const hashedPassword = await hashPassword(password)
+    const user = new User({
+      username,
+      password: hashedPassword,
+      email,
+    })
+
+    await user.save()
+    return { success: true, message: "User created successfully" }
+  } catch (error) {
+    console.error("Error creating user:", error)
+    throw error
   }
 }
