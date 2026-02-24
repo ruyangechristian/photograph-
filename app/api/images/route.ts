@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import connectToDB from '@/lib/mongoose'
 import Image from '@/models/Image'
 import { uploadImage, deleteImage } from '@/lib/cloudinary'
-import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-utils'
+import { errorResponse, serverErrorResponse } from '@/lib/api-utils'
 
 export const maxDuration = 60 // 1 minute
 export const dynamic = 'force-dynamic'
@@ -67,7 +67,13 @@ export async function POST(request: Request) {
 
     await newImage.save()
 
-    return successResponse(newImage, 'Image uploaded successfully', 201)
+    // Return both wrapped response and direct image for client compatibility
+    return NextResponse.json({
+      success: true,
+      message: 'Image uploaded successfully',
+      image: newImage,
+      data: newImage
+    }, { status: 201 })
   } catch (error) {
     console.error('[API] Error uploading image:', error)
     if (error instanceof Error && error.name === 'TimeoutError') {
@@ -81,7 +87,8 @@ export async function GET() {
   try {
     await connectToDB()
     const images = await Image.find().sort({ createdAt: -1 })
-    return successResponse(images, 'Images fetched successfully')
+    // Return images as direct array for client compatibility
+    return NextResponse.json(images)
   } catch (error) {
     console.error('[API] Error fetching images:', error)
     return serverErrorResponse(error)

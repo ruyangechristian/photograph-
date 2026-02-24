@@ -177,11 +177,21 @@ export default function AlbumsPage() {
       })
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || (editingAlbum ? 'Failed to update album' : 'Failed to create album'))
+        try {
+          const errorData = await res.json()
+          throw new Error(errorData.error || (editingAlbum ? 'Failed to update album' : 'Failed to create album'))
+        } catch {
+          throw new Error(`Server error (${res.status}): ${res.statusText || 'Failed to process request'}`)
+        }
       }
 
-      const data = await res.json()
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error('Invalid response from server')
+      }
+
       await fetchAlbums()
       setShowCreateForm(false)
       resetForm()
@@ -189,10 +199,13 @@ export default function AlbumsPage() {
 
       // Show success message with details
       let message = data.message || 'Album created successfully'
-      if (data.warnings && data.warnings.length > 0) {
-        message += `\n\nSome images could not be uploaded:\n${data.warnings.join('\n')}`
+      if (data.data?.warnings && data.data.warnings.length > 0) {
+        message += `\n\nSome images could not be uploaded:\n${data.data.warnings.join('\n')}`
       }
-      alert(message)
+      if (data.warnings && data.warnings.length > 0) {
+        message += `\n\nWarnings:\n${data.warnings.join('\n')}`
+      }
+      console.log('[Albums Success]', message)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       if (err instanceof Error && err.message.includes('timeout')) {
@@ -208,7 +221,7 @@ export default function AlbumsPage() {
 
   // Handle delete
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this album?')) return
+    if (!confirm('Are you sure you want to delete this album? This action cannot be undone.')) return
 
     try {
       setLoading(true)
@@ -217,25 +230,37 @@ export default function AlbumsPage() {
       })
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Failed to delete album')
+        try {
+          const errorData = await res.json()
+          throw new Error(errorData.error || 'Failed to delete album')
+        } catch {
+          throw new Error(`Server error (${res.status}): Failed to delete album`)
+        }
       }
 
-      const data = await res.json()
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error('Invalid response from server')
+      }
+
       await fetchAlbums()
       
       // Show success message with details
       let message = `Successfully deleted album`
-      if (data.deletedImages) {
-        message += ` with ${data.deletedImages} images`
+      if (data.data?.deletedImages) {
+        message += ` (deleted ${data.data.deletedImages} images)`
       }
-      if (data.warnings && data.warnings.length > 0) {
-        message += `\n\nSome images could not be deleted:\n${data.warnings.join('\n')}`
+      if (data.data?.warnings && data.data.warnings.length > 0) {
+        message += `\n\nWarnings:\n${data.data.warnings.join('\n')}`
       }
-      alert(message)
+      console.log('[Album Deleted]', message)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete album')
-      if (err instanceof Error && err.message.includes('timeout')) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to delete album'
+      setError(errorMsg)
+      console.error('[Delete Error]', err)
+      if (errorMsg.includes('timeout')) {
         setError('Delete operation timed out. Please try again.')
       }
     } finally {

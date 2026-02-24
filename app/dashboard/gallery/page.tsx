@@ -38,29 +38,69 @@ export default function ImageUploadPage() {
     setError(null)
 
     try {
-      for (const file of Array.from(files)) {
-        if (!file.type.match('image.*')) continue
+      const filesArray = Array.from(files)
+      let uploadedCount = 0
+      const failedFiles: string[] = []
 
-        const formData = new FormData()
-        formData.append('file', file)
+      for (const file of filesArray) {
+        try {
+          // Validate file
+          if (!file.type.match('image.*')) {
+            failedFiles.push(`${file.name}: Not an image file`)
+            continue
+          }
 
-        const response = await fetch('/api/images', {
-          method: 'POST',
-          body: formData
-        })
+          if (file.size > 10 * 1024 * 1024) {
+            failedFiles.push(`${file.name}: File too large (max 10MB)`)
+            continue
+          }
 
-        if (!response.ok) {
-          throw new Error('Upload failed')
+          // Upload file
+          const formData = new FormData()
+          formData.append('file', file)
+
+          const response = await fetch('/api/images', {
+            method: 'POST',
+            body: formData
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            failedFiles.push(`${file.name}: ${errorData.error || 'Upload failed'}`)
+            continue
+          }
+
+          const responseData = await response.json()
+          if (responseData.image) {
+            setImages(prev => [responseData.image, ...prev])
+            uploadedCount++
+          } else {
+            failedFiles.push(`${file.name}: Invalid response from server`)
+          }
+        } catch (err) {
+          failedFiles.push(`${file.name}: ${err instanceof Error ? err.message : 'Unknown error'}`)
         }
+      }
 
-        const newImage = await response.json()
-        setImages(prev => [newImage.image, ...prev])
+      // Show summary message
+      if (uploadedCount > 0) {
+        let message = `Successfully uploaded ${uploadedCount} image(s)`
+        if (failedFiles.length > 0) {
+          message += `\n\nFailed uploads:\n${failedFiles.join('\n')}`
+        }
+        console.log(message)
+      } else if (failedFiles.length > 0) {
+        setError(`Failed to upload images:\n${failedFiles.join('\n')}`)
       }
     } catch (err) {
-      setError('Failed to upload images')
-      console.error(err)
+      setError(`Upload error: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      console.error('[Gallery Upload]', err)
     } finally {
       setIsUploading(false)
+      // Reset file input
+      if (e.target) {
+        e.target.value = ''
+      }
     }
   }
 
