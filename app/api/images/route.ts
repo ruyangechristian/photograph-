@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server'
 import connectToDB from '@/lib/mongoose'
 import Image from '@/models/Image'
 import { uploadImage, deleteImage } from '@/lib/cloudinary'
+import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-utils'
 
 export const maxDuration = 60 // 1 minute
 export const dynamic = 'force-dynamic'
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 export async function POST(request: Request) {
   try {
@@ -14,19 +18,17 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      )
+      return errorResponse('No file provided', 400)
+    }
+
+    // Validate file type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return errorResponse('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed', 400)
     }
 
     // Validate file size (10MB limit)
-    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: 'Image is too large. Maximum size is 10MB' },
-        { status: 400 }
-      )
+      return errorResponse('Image is too large. Maximum size is 10MB', 400)
     }
 
     // Upload image with retry
@@ -65,26 +67,13 @@ export async function POST(request: Request) {
 
     await newImage.save()
 
-    return NextResponse.json(
-      { 
-        success: true, 
-        image: newImage,
-        message: 'Image uploaded successfully'
-      },
-      { status: 201 }
-    )
+    return successResponse(newImage, 'Image uploaded successfully', 201)
   } catch (error) {
-    console.error('Error uploading image:', error)
+    console.error('[API] Error uploading image:', error)
     if (error instanceof Error && error.name === 'TimeoutError') {
-      return NextResponse.json(
-        { error: 'Upload timed out. Please try again with a smaller file.' },
-        { status: 504 }
-      )
+      return errorResponse('Upload timed out. Please try again with a smaller file.', 504)
     }
-    return NextResponse.json(
-      { error: 'Failed to upload image' },
-      { status: 500 }
-    )
+    return serverErrorResponse(error)
   }
 }
 
@@ -92,12 +81,10 @@ export async function GET() {
   try {
     await connectToDB()
     const images = await Image.find().sort({ createdAt: -1 })
-    return NextResponse.json(images)
+    return successResponse(images, 'Images fetched successfully')
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch images' },
-      { status: 500 }
-    )
+    console.error('[API] Error fetching images:', error)
+    return serverErrorResponse(error)
   }
 }
 
@@ -109,10 +96,7 @@ export async function DELETE(request: Request) {
     const publicId = searchParams.get('id')
 
     if (!publicId) {
-      return NextResponse.json(
-        { error: 'Image ID is required' },
-        { status: 400 }
-      )
+      return errorResponse('Image ID is required', 400)
     }
 
     // Delete from Cloudinary with retry
@@ -141,23 +125,12 @@ export async function DELETE(request: Request) {
     // Then delete from MongoDB
     await Image.findOneAndDelete({ public_id: publicId })
 
-    return NextResponse.json(
-      { 
-        success: true, 
-        message: 'Image deleted successfully'
-      }
-    )
+    return successResponse(null, 'Image deleted successfully')
   } catch (error) {
-    console.error('Error deleting image:', error)
+    console.error('[API] Error deleting image:', error)
     if (error instanceof Error && error.name === 'TimeoutError') {
-      return NextResponse.json(
-        { error: 'Delete operation timed out. Please try again.' },
-        { status: 504 }
-      )
+      return errorResponse('Delete operation timed out. Please try again.', 504)
     }
-    return NextResponse.json(
-      { error: 'Failed to delete image' },
-      { status: 500 }
-    )
+    return serverErrorResponse(error)
   }
 }
