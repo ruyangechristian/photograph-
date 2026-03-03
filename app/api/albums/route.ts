@@ -30,8 +30,21 @@ export async function POST(request: Request) {
     const coverImage = formData.get('coverImage') as File
     const images = formData.getAll('images') as File[]
 
-    if (!title || !date || !coverImage || images.length === 0) {
-      return errorResponse('Missing required fields: title, date, coverImage, and images', 400)
+    // Validate required fields
+    if (!title?.trim()) {
+      return errorResponse('Album title is required', 400)
+    }
+    
+    if (!date) {
+      return errorResponse('Album date is required', 400)
+    }
+    
+    if (!coverImage) {
+      return errorResponse('Cover image is required', 400)
+    }
+    
+    if (!images || images.length === 0) {
+      return errorResponse('At least one album image is required', 400)
     }
     
     if (title.trim().length < 3) {
@@ -126,7 +139,7 @@ export async function POST(request: Request) {
         uploadedCount: uploadedImages.length + 1,
         warnings: errors.length > 0 ? errors : undefined,
       },
-      `Successfully uploaded ${uploadedImages.length + 1} images`,
+      `Album created successfully with ${uploadedImages.length + 1} image${uploadedImages.length !== 0 ? 's' : ''}`,
       201
     )
   } catch (error) {
@@ -147,11 +160,26 @@ export async function PUT(request: Request) {
     const coverImage = formData.get('coverImage') as File | null
     const images = formData.getAll('images') as File[]
 
-    if (!id || !title || !date) {
-      return errorResponse('Missing required fields: id, title, and date', 400)
+    if (!id) {
+      return errorResponse('Album ID is required', 400)
+    }
+    
+    if (!title?.trim()) {
+      return errorResponse('Album title is required', 400)
+    }
+    
+    if (!date) {
+      return errorResponse('Album date is required', 400)
     }
 
-    const existingAlbum = await Album.findById(id)
+    let existingAlbum
+    try {
+      existingAlbum = await Album.findById(id)
+    } catch (error) {
+      console.error('Error fetching album:', error)
+      return errorResponse('Invalid album ID', 400)
+    }
+    
     if (!existingAlbum) {
       return errorResponse('Album not found', 404)
     }
@@ -159,42 +187,85 @@ export async function PUT(request: Request) {
     // Update cover image if provided
     let coverUrl = existingAlbum.coverImage.url
     let coverPublicId = existingAlbum.coverImage.public_id
+    let coverImageErrors: string[] = []
+    
     if (coverImage) {
-      await deleteImage(existingAlbum.coverImage.public_id)
-      const coverBuffer = Buffer.from(await coverImage.arrayBuffer())
-      const uploaded = await uploadImage(coverBuffer)
-      coverUrl = uploaded.url
-      coverPublicId = uploaded.public_id
+      try {
+        // Delete old cover image
+        try {
+          await deleteImage(existingAlbum.coverImage.public_id)
+        } catch (error) {
+          console.error('Warning: Could not delete old cover image:', error)
+          coverImageErrors.push('Could not delete old cover image')
+        }
+        
+        // Upload new cover image
+        const coverBuffer = Buffer.from(await coverImage.arrayBuffer())
+        const uploaded = await uploadImage(coverBuffer)
+        coverUrl = uploaded.url
+        coverPublicId = uploaded.public_id
+      } catch (error) {
+        console.error('Error updating cover image:', error)
+        return errorResponse('Failed to update cover image. Please try again.', 500)
+      }
     }
 
     // Upload new images if provided
     let updatedImages = [...existingAlbum.images]
+    let newImageErrors: string[] = []
+    
     if (images.length > 0) {
       const uploadedImages = await Promise.all(
         images.map(async (image: File) => {
-          const buffer = Buffer.from(await image.arrayBuffer())
-          const { url, public_id } = await uploadImage(buffer)
-          return { url, public_id }
+          try {
+            const buffer = Buffer.from(await image.arrayBuffer())
+            const { url, public_id } = await uploadImage(buffer)
+            return { url, public_id }
+          } catch (error) {
+            console.error(`Error uploading image ${image.name}:`, error)
+            newImageErrors.push(`Failed to upload ${image.name}`)
+            return null
+          }
         })
       )
-      updatedImages = [...updatedImages, ...uploadedImages]
+      const validImages = uploadedImages.filter(Boolean) as any[]
+      if (validImages.length > 0) {
+        updatedImages = [...updatedImages, ...validImages]
+      }
     }
 
-    const updatedAlbum = await Album.findByIdAndUpdate(
-      id,
-      {
-        title,
-        date,
-        coverImage: {
-          url: coverUrl,
-          public_id: coverPublicId,
+    let updatedAlbum
+    try {
+      updatedAlbum = await Album.findByIdAndUpdate(
+        id,
+        {
+          title,
+          date,
+          coverImage: {
+            url: coverUrl,
+            public_id: coverPublicId,
+          },
+          images: updatedImages,
         },
-        images: updatedImages,
-      },
-      { new: true }
-    )
+        { new: true }
+      )
+    } catch (error) {
+      console.error('Error saving updated album:', error)
+      return serverErrorResponse('Failed to save album updates. Please try again.')
+    }
 
-    return successResponse(updatedAlbum, 'Album updated successfully')
+    if (!updatedAlbum) {
+      return errorResponse('Failed to update album', 500)
+    }
+
+    const allErrors = [...(coverImageErrors || []), ...(newImageErrors || [])]
+    return successResponse(
+      {
+        album: updatedAlbum,
+        warnings: allErrors.length > 0 ? allErrors : undefined,
+      },
+      'Album updated successfully'
+    )
   } catch (error) {
     console.error('[API] Error updating album:', error)
     return serverErrorResponse(error)

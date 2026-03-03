@@ -104,6 +104,16 @@ export default function AlbumsPage() {
   }
 
   const resetForm = () => {
+    // Clean up object URLs to prevent memory leaks
+    if (coverPreview && coverPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverPreview)
+    }
+    imagesPreviews.forEach(preview => {
+      if (preview.startsWith('blob:')) {
+        URL.revokeObjectURL(preview)
+      }
+    })
+    
     setForm({
       title: '',
       date: '',
@@ -198,18 +208,32 @@ export default function AlbumsPage() {
       setUploadProgress(100)
 
       // Show success message with details
-      let message = data.message || 'Album created successfully'
+      let message = editingAlbum ? 'Album updated successfully!' : 'Album created successfully!'
+      if (data.data?.uploadedCount) {
+        message = `${editingAlbum ? 'Album updated' : 'Album created'} with ${data.data.uploadedCount} image${data.data.uploadedCount !== 1 ? 's' : ''}!`
+      }
       if (data.data?.warnings && data.data.warnings.length > 0) {
-        message += `\n\nSome images could not be uploaded:\n${data.data.warnings.join('\n')}`
+        message += `\n\n⚠️ Warnings:\n${data.data.warnings.join('\n')}`
       }
       if (data.warnings && data.warnings.length > 0) {
-        message += `\n\nWarnings:\n${data.warnings.join('\n')}`
+        message += `\n\n⚠️ Warnings:\n${data.warnings.join('\n')}`
       }
+      
+      // Show success alert
+      alert(message)
       console.log('[Albums Success]', message)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      if (err instanceof Error && err.message.includes('timeout')) {
+      const errorMsg = err instanceof Error ? err.message : 'An error occurred'
+      console.error('[Album Error]', err)
+      
+      if (errorMsg.includes('timeout')) {
         setError('Upload timed out. Please try again with fewer images or smaller file sizes.')
+      } else if (errorMsg.includes('Cloudinary')) {
+        setError('Image upload service error. Please check your files and try again.')
+      } else if (errorMsg.includes('required')) {
+        setError('Please fill in all required fields correctly.')
+      } else {
+        setError(errorMsg)
       }
     } finally {
       setLoading(false)
@@ -348,6 +372,10 @@ export default function AlbumsPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      // Revoke blob URL if it's a local file preview
+                      if (coverPreview.startsWith('blob:')) {
+                        URL.revokeObjectURL(coverPreview)
+                      }
                       setForm(prev => ({ ...prev, coverImage: null }))
                       setCoverPreview('')
                     }}
@@ -394,14 +422,16 @@ export default function AlbumsPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            const newImages = [...form.images]
-                            newImages.splice(index, 1)
+                            // Revoke the blob URL to free memory
+                            if (imagesPreviews[index]?.startsWith('blob:')) {
+                              URL.revokeObjectURL(imagesPreviews[index])
+                            }
+                            
+                            const newImages = form.images.filter((_, i) => i !== index)
+                            const newPreviews = imagesPreviews.filter((_, i) => i !== index)
+                            
                             setForm(prev => ({ ...prev, images: newImages }))
-                            setImagesPreviews(prev => {
-                              const newPreviews = [...prev]
-                              newPreviews.splice(index, 1)
-                              return newPreviews
-                            })
+                            setImagesPreviews(newPreviews)
                           }}
                           className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition"
                           aria-label={`Remove image ${index + 1}`}
