@@ -14,10 +14,13 @@ type Album = {
   category?: string;
 };
 
+type Category = "Events" | "Documentary" | "Video";
+
 export default function Home() {
   const [showAll, setShowAll] = useState(false);
   const [eventAlbums, setEventAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<Category>("Events");
 
   useEffect(() => {
     const getAlbums = async (): Promise<Album[]> => {
@@ -42,7 +45,7 @@ export default function Home() {
             date: "2023",
             coverImage: "/images/wildlife-monkey1.png",
             images: 24,
-            category: "Wedding"
+            category: "Events"
           },
           {
             id: 2,
@@ -50,7 +53,7 @@ export default function Home() {
             date: "2023",
             coverImage: "/images/wedding-couple.png",
             images: 36,
-            category: "Wedding"
+            category: "Events"
           },
           {
             id: 3,
@@ -58,7 +61,7 @@ export default function Home() {
             date: "2023",
             coverImage: "/images/corporate-event.png",
             images: 18,
-            category: "Corporate"
+            category: "Events"
           },
           {
             id: 4,
@@ -66,7 +69,23 @@ export default function Home() {
             date: "2023",
             coverImage: "/images/family-portrait.png",
             images: 12,
-            category: "Portrait"
+            category: "Documentary"
+          },
+          {
+            id: 5,
+            title: "Conference Highlights",
+            date: "2023",
+            coverImage: "/images/corporate-event.png",
+            images: 28,
+            category: "Video"
+          },
+          {
+            id: 6,
+            title: "Event Coverage",
+            date: "2023",
+            coverImage: "/images/wedding-couple.png",
+            images: 15,
+            category: "Documentary"
           }
         ];
       }
@@ -81,18 +100,23 @@ export default function Home() {
     fetchAlbums();
   }, []);
 
-  const shouldShowToggle = eventAlbums.length > 4;
+  // Filter albums by selected category
+  const filteredAlbums = eventAlbums.filter(
+    (album) => album.category === selectedCategory
+  );
+
+  const shouldShowToggle = filteredAlbums.length > 4;
   const displayedAlbums = shouldShowToggle && !showAll 
-    ? eventAlbums.slice(0, 4) 
-    : eventAlbums;
+    ? filteredAlbums.slice(0, 4) 
+    : filteredAlbums;
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* Hero Section */}
       <div className="relative w-full h-screen">
         <Image 
-          src="/images/landscape-bridge.png" 
-          alt="Photography example" 
+          src="/images/panel-discussion-event.jpeg" 
+          alt="Professional panel discussion at conference event" 
           fill 
           priority 
           className="object-cover"
@@ -134,7 +158,25 @@ export default function Home() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* Category Filter Buttons */}
+            <div className="flex justify-center gap-4 mb-16">
+              {(["Events", "Documentary", "Video"] as const).map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`px-8 py-3 rounded-full font-medium transition-all duration-300 ${
+                    selectedCategory === category
+                      ? "bg-black text-white shadow-lg"
+                      : "bg-white text-black border-2 border-gray-300 hover:border-black"
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
+            {/* Portfolio Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {displayedAlbums.map((album, index) => (
                 <Link 
                   href={`/galleries/${album.id}`} 
@@ -192,7 +234,7 @@ export default function Home() {
                     </>
                   ) : (
                     <>
-                      <span>Show All ({eventAlbums.length})</span>
+                      <span>Show All ({filteredAlbums.length})</span>
                       <ChevronDown className="h-5 w-5" />
                     </>
                   )}
