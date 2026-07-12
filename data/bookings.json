@@ -1,0 +1,12 @@
+[
+  {
+    "id": "1782987050638",
+    "name": "Test",
+    "email": "test@example.com",
+    "phone": "0785000000",
+    "sessionType": "Event",
+    "date": "2026-07-10",
+    "message": "Hello",
+    "createdAt": "2026-07-02T10:10:50.638Z"
+  }
+]
