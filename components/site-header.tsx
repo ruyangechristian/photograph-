@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Menu, X, Camera } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const links = [
@@ -30,11 +30,8 @@ export function SiteHeader() {
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-8">
-        <a href="#home" className="flex items-center gap-2 text-white">
-          <Camera className="h-6 w-6" aria-hidden="true" />
-          <span className="font-heading text-lg font-bold tracking-tight md:text-xl">
-            Iremefocus
-          </span>
+        <a href="#home" className="flex items-center">
+          <img src="/IREME_V10-official-01.png" alt="IREMEfocus" className="h-10 w-auto md:h-12" />
         </a>
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
@@ -50,7 +47,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden md:block">
-          <Button asChild className="rounded-full bg-white px-6 text-white hover:bg-white/90">
+          <Button asChild className="rounded-full bg-white px-6 text-black hover:bg-white/90">
             <a href="#book">Book Session</a>
           </Button>
         </div>

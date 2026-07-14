@@ -42,7 +42,7 @@ export const metadata: Metadata = {
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/icon.svg',
+        url: '/IREME_V10-official-01.png',
         type: 'image/svg+xml',
       },
     ],
