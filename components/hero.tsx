@@ -7,7 +7,7 @@ export function Hero() {
     <section id="home" className="relative flex min-h-screen items-center justify-center overflow-hidden">
       {/* Landing image (4.jpeg) */}
       <Image
-        src="/hero.jpg"
+        src="/WhatsApp Image 2026-07-16 at 12.48.09.jpeg"
         alt="Iremefocus capturing a panel discussion event on stage"
         fill
         priority

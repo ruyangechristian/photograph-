@@ -31,7 +31,7 @@ export function SiteHeader() {
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-8">
         <a href="#home" className="flex items-center">
-          <img src="/IREME_V10-official-01.png" alt="IREMEfocus" className="h-10 w-auto md:h-12" />
+          <img src="/WHITE IREMEFOCUS LOGO.png" alt="IREMEfocus" className="h-12 w-auto md:h-16" />
         </a>
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">

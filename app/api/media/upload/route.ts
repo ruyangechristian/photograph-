@@ -19,40 +19,63 @@ async function checkAuth() {
   return sessions.some((s) => s.id === sessionId)
 }
 
+async function uploadSingle(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const buffer = Buffer.from(bytes)
+
+  return await new Promise<any>((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      {
+        folder: 'photograph',
+        resource_type: file.type.startsWith('video') ? 'video' : 'image',
+      },
+      (error, result) => {
+        if (error) reject(error)
+        else resolve(result)
+      },
+    ).end(buffer)
+  })
+}
+
 export async function POST(request: Request) {
   if (!(await checkAuth())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
     const form = await request.formData()
-    const file = form.get('file') as File | null
-    if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+    const files = form.getAll('file') as File[]
+
+    if (!files.length) {
+      return NextResponse.json({ error: 'No files uploaded' }, { status: 400 })
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    const buffer = Buffer.from(bytes)
+    const results = await Promise.allSettled(
+      files.map(async (file) => {
+        const result = await uploadSingle(file)
+        return {
+          filename: result.original_filename || file.name,
+          url: result.secure_url,
+          thumbnail: result.thumbnail_url,
+        }
+      }),
+    )
 
-    const result = await new Promise<any>((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        {
-          folder: 'photograph',
-          resource_type: file.type.startsWith('video') ? 'video' : 'image',
-        },
-        (error, result) => {
-          if (error) reject(error)
-          else resolve(result)
-        },
-      ).end(buffer)
-    })
+    const successes = results
+      .map((r, idx) => (r.status === 'fulfilled' ? { ...r.value, index: idx } : null))
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+
+    const failures = results
+      .map((r, idx) => (r.status === 'rejected' ? { index: idx, error: r.reason instanceof Error ? r.reason.message : 'Upload failed' } : null))
+      .filter((item): item is NonNullable<typeof item> => item !== null)
 
     return NextResponse.json({
-      filename: result.original_filename || file.name,
-      url: result.secure_url,
-      thumbnail: result.thumbnail_url,
+      results: successes,
+      failures,
+      total: files.length,
+      successCount: successes.length,
     })
   } catch (error) {
-    console.error('Cloudinary upload error:', error)
+    console.error('Batch upload error:', error)
     const message = error instanceof Error ? error.message : 'Upload failed'
     return NextResponse.json({ error: message }, { status: 500 })
   }

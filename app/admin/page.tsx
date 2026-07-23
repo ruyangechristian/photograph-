@@ -14,6 +14,9 @@ export default function AdminPage() {
   const [mediaForm, setMediaForm] = useState({ title: '', category: 'event', type: 'photo', url: '' })
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({ completed: 0, total: 0 })
+  const [uploadErrors, setUploadErrors] = useState<string[]>([])
+  const [uploadedSuccessCount, setUploadedSuccessCount] = useState(0)
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -78,24 +81,61 @@ export default function AdminPage() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
+
     setUploading(true)
+    setUploadProgress({ completed: 0, total: files.length })
+    setUploadErrors([])
+    setUploadedSuccessCount(0)
+
     const newMedia: { title: string; category: string; type: string; url: string; createdAt: string }[] = []
-    for (const file of files) {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch('/api/media/upload', { method: 'POST', body: form })
-      const data = await res.json()
-      if (data.url) {
-        newMedia.push({
-          title: data.filename || file.name,
-          category: mediaForm.category,
-          type: file.type.startsWith('video') ? 'video' : 'photo',
-          url: data.url,
-          createdAt: new Date().toISOString(),
-        })
-      }
+
+    const CHUNK_SIZE = 5
+    let completed = 0
+
+    for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+      const chunk = files.slice(i, i + CHUNK_SIZE)
+      const chunkResults = await Promise.allSettled(
+        chunk.map((file) => {
+          const form = new FormData()
+          form.append('file', file)
+          return fetch('/api/media/upload', { method: 'POST', body: form })
+            .then((res) => {
+              if (!res.ok) {
+                throw new Error(`Upload failed with status ${res.status}`)
+              }
+              return res.json()
+            })
+            .then((data) => {
+              if (data.results && data.results.length > 0) {
+                const result = data.results[0]
+                newMedia.push({
+                  title: result.filename || file.name,
+                  category: mediaForm.category,
+                  type: file.type.startsWith('video') ? 'video' : 'photo',
+                  url: result.url,
+                  createdAt: new Date().toISOString(),
+                })
+                setUploadedSuccessCount((c) => c + 1)
+              } else if (data.error) {
+                throw new Error(`${file.name}: ${data.error}`)
+              } else {
+                throw new Error(`${file.name}: Upload failed`)
+              }
+            })
+            .catch((err) => {
+              const message = err instanceof Error ? err.message : `${file.name}: Upload failed`
+              setUploadErrors((prev) => [...prev, message])
+              return null
+            })
+        }),
+      )
+
+      completed += chunk.length
+      setUploadProgress({ completed, total: files.length })
     }
+
     setUploading(false)
+
     if (newMedia.length) {
       const res = await fetch('/api/media', {
         method: 'POST',
@@ -204,9 +244,29 @@ export default function AdminPage() {
                       onChange={handleUpload}
                       className="block w-full text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground hover:file:bg-primary/90"
                     />
-                    {uploading && <p className="mt-1 text-xs text-white/60">Uploading...</p>}
-                    {mediaForm.url && !uploading && (
-                      <p className="mt-1 truncate text-xs text-white/60">File: {mediaForm.url}</p>
+                    {uploading && (
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-xs text-white/60">
+                          <span>Uploading... {uploadProgress.completed}/{uploadProgress.total}</span>
+                          <span>{Math.round((uploadProgress.completed / uploadProgress.total) * 100)}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all duration-300"
+                            style={{ width: `${(uploadProgress.completed / uploadProgress.total) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {uploadErrors.length > 0 && !uploading && (
+                      <div className="mt-2 space-y-1">
+                        {uploadErrors.map((err, idx) => (
+                          <p key={idx} className="text-xs text-red-400">{err}</p>
+                        ))}
+                      </div>
+                    )}
+                    {uploadedSuccessCount > 0 && !uploading && (
+                      <p className="mt-2 truncate text-xs text-green-400">Successfully uploaded {uploadedSuccessCount} file{uploadedSuccessCount !== 1 ? 's' : ''}</p>
                     )}
                   </div>
                   <div>

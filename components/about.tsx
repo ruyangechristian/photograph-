@@ -8,12 +8,12 @@ export function About() {
         <div className="relative">
           <div className="relative aspect-[4/5] overflow-hidden rounded-3xl">
             <Image
-              src="/ceo.jpg"
+              src="/me.png"
               alt="Mohamed, Founder & CEO of Iremefocus"
               fill
               loading="lazy"
               sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover object-top"
+              className="object-contain"
             />
           </div>
           <div className="absolute -bottom-6 -right-4 hidden rounded-2xl bg-black px-6 py-5 text-white shadow-xl sm:block">
